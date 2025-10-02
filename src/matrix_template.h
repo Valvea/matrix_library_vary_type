@@ -27,6 +27,13 @@
 #define ROW_DELIMETER ' '
 #define NEW_LINE '\n'
 
+static inline void function_(swap_elements)(MATRIX_TYPE *first,
+                                            MATRIX_TYPE *second) {
+  MATRIX_TYPE temp = *first;
+  *first = *second;
+  *second = temp;
+}
+
 static int function_(input)(MATRIX_TYPE *row, int cols) {
   MATRIX_TYPE temp = 0;
   int i = 0;
@@ -44,10 +51,17 @@ MATRIX_TYPE **function_(create_matrix)(int rows, int cols) {
       calloc(1, rows * sizeof *matrix + rows * cols * sizeof **matrix);
   if (!matrix)
     return NULL;
-  MATRIX_TYPE *row0 = (MATRIX_TYPE *)(matrix + rows);
+  MATRIX_TYPE *flat_ptr =(MATRIX_TYPE *)(matrix + rows);
   for (int row = 0; row < rows; row++)
-    matrix[row] = row0 + row * cols;
+    matrix[row] = flat_ptr + row * cols;
   return matrix;
+}
+
+MATRIX_TYPE *function_(matrix_to_array)(MATRIX_TYPE *const *matrix, int rows) {
+
+  if (!matrix || rows <= 0)
+    return NULL;
+  return (MATRIX_TYPE *)(matrix + rows);
 }
 
 int function_(fillmatrix)(MATRIX_TYPE **matrix, int rows, int cols) {
@@ -69,6 +83,25 @@ void function_(printmatrix)(const MATRIX_TYPE *const *matrix, int rows,
     function_(output)(matrix[row], cols);
     printf("%c", NEW_LINE);
   }
+}
+
+MATRIX_TYPE **function_(scan_matrix)(MATRIX_TYPE **matrix_ptr, int *rows,
+                                     int *cols) {
+
+  char end_char = NEW_LINE;
+
+  if (scanf("%d %d%c", rows, cols, &end_char) == 3 && end_char == NEW_LINE) {
+    matrix_ptr = function_(create_matrix)(*rows, *cols);
+    if (!matrix_ptr)
+      return NULL;
+    if (!function_(fillmatrix)(matrix_ptr, *rows, *cols)) {
+      free(matrix_ptr);
+      return NULL;
+    } else
+      return matrix_ptr;
+
+  } else
+    return NULL;
 }
 
 MATRIX_TYPE function_(sumarray)(const MATRIX_TYPE *array, int length) {
@@ -119,10 +152,9 @@ MATRIX_TYPE **function_(sum_matrix)(const MATRIX_TYPE *const *matrix_A,
   return result_matrix;
 }
 
-
-
-
-MATRIX_TYPE *function_(col_to_array)(const MATRIX_TYPE * const *matrix_origin, MATRIX_TYPE array[], int rows, int col_idx) {
+MATRIX_TYPE *function_(col_to_array)(const MATRIX_TYPE *const *matrix_origin,
+                                     MATRIX_TYPE array[], int rows,
+                                     int col_idx) {
 
   if (!array || !matrix_origin)
     return NULL;
@@ -137,8 +169,9 @@ MATRIX_TYPE *function_(col_to_array)(const MATRIX_TYPE * const *matrix_origin, M
   return array;
 }
 
-
-int *row_to_array(int **matrix_origin, int array[], int row_idx, int cols) {
+MATRIX_TYPE *function_(row_to_array)(const MATRIX_TYPE *const *matrix_origin,
+                                     MATRIX_TYPE array[], int row_idx,
+                                     int cols) {
   if (!array || !matrix_origin)
     return NULL;
 
@@ -152,13 +185,8 @@ int *row_to_array(int **matrix_origin, int array[], int row_idx, int cols) {
   return array;
 }
 
-
-
-
-
 MATRIX_TYPE **function_(T_matrix)(const MATRIX_TYPE *const *matrix_origin,
-                                  int rows, int cols)
-{
+                                  int rows, int cols) {
 
   int rowsT = cols, colsT = rows;
 
@@ -175,7 +203,8 @@ MATRIX_TYPE **function_(T_matrix)(const MATRIX_TYPE *const *matrix_origin,
 
   for (int rowT = 0; rowT < rowsT; rowT++) {
 
-    memcpy(T_matrix[rowT], function_(col_to_array)(matrix_origin, array, rows, rowT),
+    memcpy(T_matrix[rowT],
+           function_(col_to_array)(matrix_origin, array, rows, rowT),
            rows * sizeof *T_matrix[rowT]);
   }
 
@@ -183,4 +212,133 @@ MATRIX_TYPE **function_(T_matrix)(const MATRIX_TYPE *const *matrix_origin,
   return T_matrix;
 }
 
+MATRIX_TYPE function_(dot_arrays)(const MATRIX_TYPE *arrayA,
+                                  const MATRIX_TYPE *arrayB, int length) {
 
+  int mult = 0;
+
+  if (!arrayA || !arrayB)
+    return mult;
+
+  for (int index = 0; index < length; index++) {
+
+    mult += arrayA[index] * arrayB[index];
+  }
+
+  return mult;
+}
+
+MATRIX_TYPE **function_(dot_matrix)(const MATRIX_TYPE *const *matrix_A,
+                                    const MATRIX_TYPE *const *matrix_B,
+                                    int rowsA, int colsA, int rowsB,
+                                    int colsB) {
+
+  if (colsA != rowsB)
+    return NULL;
+
+  int rowsR = rowsA, colsR = colsB, length_array = colsA;
+
+  MATRIX_TYPE **result_matrix = function_(create_matrix)(rowsR, colsR);
+
+  if (!result_matrix)
+    return NULL;
+
+  MATRIX_TYPE **matrix_T = function_(T_matrix)(matrix_B, rowsB, colsB);
+
+  if (!matrix_T) {
+    free(result_matrix);
+    return NULL;
+  }
+
+  for (int row = 0; row < rowsR; row++) {
+
+    for (int col = 0; col < colsR; col++) {
+
+      result_matrix[row][col] =
+          function_(dot_arrays)(matrix_A[row], matrix_T[col], length_array);
+    }
+  }
+
+  free(matrix_T);
+
+  return result_matrix;
+}
+
+static void function_(_quick_sort_)(MATRIX_TYPE array[], int length) {
+  if (length < 2)
+    return;
+
+  int support_idx = 0;
+  MATRIX_TYPE support_element = array[support_idx];
+
+  for (int idx = 1; idx < length; ++idx) {
+    if (array[idx] > support_element) {
+      int searcher_idx = idx;
+
+      while (searcher_idx < length && array[searcher_idx] > support_element)
+        ++searcher_idx;
+
+      if (searcher_idx == length)
+        break; // всё справа > опорного → к рекурсии
+      function_(swap_elements)(&array[idx], &array[searcher_idx]);
+    }
+    function_(swap_elements)(&array[support_idx], &array[idx]);
+    support_idx = idx;
+    support_element = array[support_idx];
+  }
+
+  function_(_quick_sort_)(array, support_idx);
+  function_(_quick_sort_)(array + support_idx + 1, length - support_idx - 1);
+}
+
+MATRIX_TYPE **function_(from_array_to_matrix)(const MATRIX_TYPE array[],
+                                              int length_array, int rows,
+                                              int cols) {
+
+  if (!array || (rows * cols) != length_array)
+    return NULL;
+
+  MATRIX_TYPE **matrix =
+      calloc(1, rows * sizeof *matrix + rows * cols * sizeof **matrix);
+
+  if (!matrix)
+    return NULL;
+
+  MATRIX_TYPE *flat_ptr = function_(matrix_to_array)(matrix, rows);
+
+  for (int row = 0; row < rows; row++)
+    matrix[row] = flat_ptr + cols * row;
+
+  memcpy(flat_ptr, array, length_array * sizeof *array);
+
+  return matrix;
+}
+
+MATRIX_TYPE **function_(sort_matrix)(MATRIX_TYPE **matrix, int rows, int cols) {
+
+  if (!matrix || rows <= 0 || cols <= 0)
+    return NULL;
+
+  MATRIX_TYPE *array = function_(matrix_to_array)(matrix, rows);
+  if (!array)
+    return NULL;
+
+  int array_length = rows * col;
+
+  MATRIX_TYPE *temp_block_memory =
+      malloc(array_length * sizeof *temp_block_memory);
+
+  if (!temp_block_memory)
+    return NULL;
+
+  array = memcpy(temp_block_memory, array, array_length * sizeof *array);
+
+  function_(_quick_sort_)(array, array_length);
+
+  MATRIX_TYPE **sorted_matrix =
+      function_(from_array_to_matrix)(array, array_length, rows, cols);
+
+  free(temp_block_memory);
+
+  return sorted_matrix;
+}
