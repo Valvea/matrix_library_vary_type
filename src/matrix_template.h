@@ -24,8 +24,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ROW_DELIMETER ' '
+#define ROW_DELIMITERS " \t\n,;|"
 #define NEW_LINE '\n'
+#define OUTPUT_DELIMITER ' '
+
+
+void function_(free_matrix)(MATRIX_TYPE **matrix) { free(matrix); }
+
 
 static inline void function_(swap_elements)(MATRIX_TYPE *first,
                                             MATRIX_TYPE *second) {
@@ -34,24 +39,51 @@ static inline void function_(swap_elements)(MATRIX_TYPE *first,
   *second = temp;
 }
 
-static int function_(input)(MATRIX_TYPE *row, int cols) {
+static int input_row(MATRIX_TYPE *row, int cols) {
+  if (!row || cols <= 0)
+    return 0;
   MATRIX_TYPE temp = 0;
-  int i = 0;
-  char del = ' ';
-  while (i < cols && scanf(MATRIX_SCANF "%c", &temp, &del) == 2 &&
-         (del == ROW_DELIMETER || del == NEW_LINE)) {
-    row[i++] = temp;
+  int index = 0;
+  char delimiter = OUTPUT_DELIMITER;
+  while (index < cols) {
+    int scanned = scanf(MATRIX_SCANF "%c", &temp, &delimiter);
+
+    switch (scanned) {
+    case EOF:
+    case 0:
+      return index;
+      break;
+    case 1:
+      if (feof(stdin)) {row[index++] = temp; return index;}
+      else return index;
+      break;
+    case 2:
+      if (strchr(ROW_DELIMITERS, delimiter))
+        row[index++] = temp;
+      else return index;
+      break;
+    }
   }
-  return i;
+  return index;
+}
+
+static void output_row(const MATRIX_TYPE *row, int cols) {
+  if (cols <= 0)
+    return;
+  for (int col = 0; col < cols - 1; col++)
+    printf(MATRIX_PRINTF "%c", row[col], OUTPUT_DELIMITER);
+  printf(MATRIX_PRINTF, row[cols - 1]);
 }
 
 MATRIX_TYPE **function_(create_matrix)(int rows, int cols) {
   // единый блок: [rows указателей][rows*cols элементов]
+  if (rows <= 0 || cols <= 0)
+    return NULL;
   MATRIX_TYPE **matrix =
       calloc(1, rows * sizeof *matrix + rows * cols * sizeof **matrix);
   if (!matrix)
     return NULL;
-  MATRIX_TYPE *flat_ptr =(MATRIX_TYPE *)(matrix + rows);
+  MATRIX_TYPE *flat_ptr = (MATRIX_TYPE *)(matrix + rows);
   for (int row = 0; row < rows; row++)
     matrix[row] = flat_ptr + row * cols;
   return matrix;
@@ -61,26 +93,20 @@ MATRIX_TYPE *function_(matrix_to_array)(MATRIX_TYPE *const *matrix, int rows) {
 
   if (!matrix || rows <= 0)
     return NULL;
-  return (MATRIX_TYPE *)(matrix + rows);
+  return  (MATRIX_TYPE *)(matrix + rows);
 }
 
 int function_(fillmatrix)(MATRIX_TYPE **matrix, int rows, int cols) {
   for (int r = 0; r < rows; r++)
-    if (function_(input)(matrix[r], cols) != cols)
+    if (input_row(matrix[r], cols) != cols)
       return 0;
   return 1;
-}
-
-static void function_(output)(const MATRIX_TYPE *row, int cols) {
-  for (int col = 0; col < cols - 1; col++)
-    printf(MATRIX_PRINTF "%c", row[col], ROW_DELIMETER);
-  printf(MATRIX_PRINTF, row[cols - 1]);
 }
 
 void function_(printmatrix)(const MATRIX_TYPE *const *matrix, int rows,
                             int cols) {
   for (int row = 0; row < rows; row++) {
-    function_(output)(matrix[row], cols);
+    output_row(matrix[row], cols);
     printf("%c", NEW_LINE);
   }
 }
@@ -118,7 +144,7 @@ MATRIX_TYPE function_(minarray)(const MATRIX_TYPE *array, int length) {
     return 0;
   MATRIX_TYPE min = array[0];
   for (int index = 1; index < length; index++)
-    if (array[i] < min)
+    if (array[index] < min)
       min = array[index];
   return min;
 }
@@ -127,7 +153,7 @@ MATRIX_TYPE function_(maxarray)(const MATRIX_TYPE *array, int length) {
   if (!array || length <= 0)
     return 0;
   MATRIX_TYPE max = array[0];
-  for (int index = 1; index < length; i++)
+  for (int index = 1; index < length; index++)
     if (array[index] > max)
       max = array[index];
   return max;
@@ -152,9 +178,20 @@ MATRIX_TYPE **function_(sum_matrix)(const MATRIX_TYPE *const *matrix_A,
   return result_matrix;
 }
 
+MATRIX_TYPE *function_(row_to_array)(const MATRIX_TYPE *const *matrix_origin,
+                                     MATRIX_TYPE array[], int row_idx,
+                                     int cols) {
+  if (!array || !matrix_origin)
+    return NULL;
+
+  memmove(array, matrix_origin[row_idx], cols * sizeof *matrix_origin[row_idx]);
+
+  return array;
+}
+
 MATRIX_TYPE *function_(col_to_array)(const MATRIX_TYPE *const *matrix_origin,
-                                     MATRIX_TYPE array[], int rows,
-                                     int col_idx) {
+                                     MATRIX_TYPE array[], int col_idx,
+                                     int rows) {
 
   if (!array || !matrix_origin)
     return NULL;
@@ -164,22 +201,6 @@ MATRIX_TYPE *function_(col_to_array)(const MATRIX_TYPE *const *matrix_origin,
   for (; row < rows; row++) {
 
     array[row] = matrix_origin[row][col_idx];
-  }
-
-  return array;
-}
-
-MATRIX_TYPE *function_(row_to_array)(const MATRIX_TYPE *const *matrix_origin,
-                                     MATRIX_TYPE array[], int row_idx,
-                                     int cols) {
-  if (!array || !matrix_origin)
-    return NULL;
-
-  int col = 0;
-
-  for (; col < cols; col++) {
-
-    array[col] = matrix_origin[row_idx][col];
   }
 
   return array;
@@ -204,8 +225,8 @@ MATRIX_TYPE **function_(T_matrix)(const MATRIX_TYPE *const *matrix_origin,
   for (int rowT = 0; rowT < rowsT; rowT++) {
 
     memcpy(T_matrix[rowT],
-           function_(col_to_array)(matrix_origin, array, rows, rowT),
-           rows * sizeof *T_matrix[rowT]);
+           function_(col_to_array)(matrix_origin, array, rowT, rows),
+           rows * sizeof *array);
   }
 
   free(array);
@@ -215,7 +236,7 @@ MATRIX_TYPE **function_(T_matrix)(const MATRIX_TYPE *const *matrix_origin,
 MATRIX_TYPE function_(dot_arrays)(const MATRIX_TYPE *arrayA,
                                   const MATRIX_TYPE *arrayB, int length) {
 
-  int mult = 0;
+  MATRIX_TYPE mult = 0;
 
   if (!arrayA || !arrayB)
     return mult;
@@ -295,7 +316,8 @@ MATRIX_TYPE **function_(from_array_to_matrix)(const MATRIX_TYPE array[],
                                               int length_array, int rows,
                                               int cols) {
 
-  if (!array || (rows * cols) != length_array)
+  if (!array || (rows * cols) != length_array || !length_array || rows <= 0 ||
+      cols <= 0)
     return NULL;
 
   MATRIX_TYPE **matrix =
@@ -323,7 +345,7 @@ MATRIX_TYPE **function_(sort_matrix)(MATRIX_TYPE **matrix, int rows, int cols) {
   if (!array)
     return NULL;
 
-  int array_length = rows * col;
+  int array_length = rows * cols;
 
   MATRIX_TYPE *temp_block_memory =
       malloc(array_length * sizeof *temp_block_memory);
@@ -342,3 +364,5 @@ MATRIX_TYPE **function_(sort_matrix)(MATRIX_TYPE **matrix, int rows, int cols) {
 
   return sorted_matrix;
 }
+
+
