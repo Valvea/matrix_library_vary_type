@@ -28,9 +28,7 @@
 #define NEW_LINE '\n'
 #define OUTPUT_DELIMITER ' '
 
-
 void function_(free_matrix)(MATRIX_TYPE **matrix) { free(matrix); }
-
 
 static inline void function_(swap_elements)(MATRIX_TYPE *first,
                                             MATRIX_TYPE *second) {
@@ -54,13 +52,17 @@ static int input_row(MATRIX_TYPE *row, int cols) {
       return index;
       break;
     case 1:
-      if (feof(stdin)) {row[index++] = temp; return index;}
-      else return index;
+      if (feof(stdin)) {
+        row[index++] = temp;
+        return index;
+      } else
+        return index;
       break;
     case 2:
       if (strchr(ROW_DELIMITERS, delimiter))
         row[index++] = temp;
-      else return index;
+      else
+        return index;
       break;
     }
   }
@@ -93,7 +95,7 @@ MATRIX_TYPE *function_(matrix_to_array)(MATRIX_TYPE *const *matrix, int rows) {
 
   if (!matrix || rows <= 0)
     return NULL;
-  return  (MATRIX_TYPE *)(matrix + rows);
+  return (MATRIX_TYPE *)(matrix + rows);
 }
 
 int function_(fillmatrix)(MATRIX_TYPE **matrix, int rows, int cols) {
@@ -285,33 +287,6 @@ MATRIX_TYPE **function_(dot_matrix)(const MATRIX_TYPE *const *matrix_A,
   return result_matrix;
 }
 
-static void function_(_quick_sort_)(MATRIX_TYPE array[], int length) {
-  if (length < 2)
-    return;
-
-  int support_idx = 0;
-  MATRIX_TYPE support_element = array[support_idx];
-
-  for (int idx = 1; idx < length; ++idx) {
-    if (array[idx] > support_element) {
-      int searcher_idx = idx;
-
-      while (searcher_idx < length && array[searcher_idx] > support_element)
-        ++searcher_idx;
-
-      if (searcher_idx == length)
-        break; // всё справа > опорного → к рекурсии
-      function_(swap_elements)(&array[idx], &array[searcher_idx]);
-    }
-    function_(swap_elements)(&array[support_idx], &array[idx]);
-    support_idx = idx;
-    support_element = array[support_idx];
-  }
-
-  function_(_quick_sort_)(array, support_idx);
-  function_(_quick_sort_)(array + support_idx + 1, length - support_idx - 1);
-}
-
 MATRIX_TYPE **function_(from_array_to_matrix)(const MATRIX_TYPE array[],
                                               int length_array, int rows,
                                               int cols) {
@@ -334,6 +309,112 @@ MATRIX_TYPE **function_(from_array_to_matrix)(const MATRIX_TYPE array[],
   memcpy(flat_ptr, array, length_array * sizeof *array);
 
   return matrix;
+}
+
+static void function_(insertion_sort)(MATRIX_TYPE array[], int length) {
+
+  MATRIX_TYPE key_element = 0;
+  int left_index = 0;
+
+  for (int index = 1; index < length; index++) {
+
+    key_element = array[index];
+    left_index = index - 1;
+
+    while (left_index >= 0 && array[left_index] > key_element) {
+      array[left_index + 1] = array[left_index];
+      left_index--;
+    }
+    array[left_index + 1] = key_element;
+  }
+}
+
+/* ядро без проверок монотонности */
+static void function_(_quick_sort_core)(MATRIX_TYPE *array, int length) {
+
+  if (length == 2) {
+    if (array[0] > array[1])
+      function_(swap_elements)(&array[0], &array[1]);
+    return;
+  }
+
+  if (length <= 24) {
+    function_(insertion_sort)(array, length);
+    return;
+  }
+
+  int support_idx = 0;
+  MATRIX_TYPE support_element = array[support_idx];
+  int right_scanner = length - 1;     // правый сканер
+  int left_scanner = support_idx + 1; // левый сканер
+
+  int seen_less = 0, seen_greater = 0;
+  while (right_scanner > left_scanner) {
+
+    while (left_scanner < length && support_element >= array[left_scanner]) {
+      if (array[left_scanner] < support_element)
+        seen_less = 1;
+      ++left_scanner;
+    }
+    // границы проверяем первыми — безопасно
+    while (right_scanner > 0 && array[right_scanner] > support_element) {
+      seen_greater = 1;
+      --right_scanner;
+    }
+
+    if (right_scanner > left_scanner) {
+      function_(swap_elements)(&array[right_scanner], &array[left_scanner]);
+      // указатели не инкрементируем здесь: следующий проход сам их подвинет
+      // через while
+    }
+  }
+
+  /* если ни одного < и ни одного > не встретили — подмассив был весь равный
+   */
+  if (!seen_less && !seen_greater)
+    return;
+
+  // ставим опору на финальное место (последний <= support_element)
+  if (support_element > array[right_scanner])
+    function_(swap_elements)(&array[support_idx], &array[right_scanner]);
+
+  // независимая рекурсия по левой/правой части
+  const int left_length = right_scanner;
+  const int right_length = length - right_scanner - 1;
+
+  if (left_length >= 2)
+    function_(user_quick_sort_core)(array, left_length);
+  if (right_length >= 2)
+    function_(user_quick_sort_core)(array + right_scanner + 1, right_length);
+}
+
+static void function_(_quick_sort_)(MATRIX_TYPE *array, int length) {
+  if (length < 2)
+    return;
+
+  int sorted = 1;
+  int reversed = 1;
+
+  for (int index = 1; index < length && (sorted || reversed);
+       ++index) {
+    if (array[index - 1] > array[index])
+      sorted = 0;
+    if (array[index - 1] < array[index])
+      reversed = 0;
+  }
+
+  if (sorted)
+    return;
+
+  if (reversed) {
+    // развернуть и выйти
+    for (int left = 0, right = length - 1; left < right; ++left, --right)
+      function_(swap_elements)(&array[left], &array[right]);
+    return;
+  }
+
+  // обычная работа
+  function_(_quick_sort_core)(array, length);
 }
 
 MATRIX_TYPE **function_(sort_matrix)(MATRIX_TYPE **matrix, int rows, int cols) {
@@ -365,4 +446,27 @@ MATRIX_TYPE **function_(sort_matrix)(MATRIX_TYPE **matrix, int rows, int cols) {
   return sorted_matrix;
 }
 
+int function_(set_row)(MATRIX_TYPE **matrix, const MATRIX_TYPE array[],
+                       int row_idx, int rows, int cols) {
 
+  if (!matrix || !array || (row_idx < 0 || row_idx >= rows) || rows <= 0 ||
+      cols <= 0)
+    return -1;
+
+  memmove(matrix[row_idx], array, cols * sizeof *array);
+
+  return row_idx;
+}
+
+int function_(set_col)(MATRIX_TYPE **matrix, const MATRIX_TYPE array[],
+                       int col_idx, int rows, int cols) {
+
+  if (!matrix || !array || (col_idx < 0 || col_idx >= cols) || rows <= 0 ||
+      cols <= 0)
+    return -1;
+
+  for (int row = 0; row < rows; row++)
+    matrix[row][col_idx] = array[row];
+
+  return col_idx;
+}

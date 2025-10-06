@@ -7,10 +7,10 @@ void printmatrix_int(const int *const *matrix, int rows, int cols);
 int **sort_matrix_int(int **matrix, int rows, int cols);
 void free_matrix_int(int **matrix);
 
-int sumarray_int(const int *array, int length);
-int minarray_int(const int *array, int length);
-int maxarray_int(const int *array, int length);
-int dot_arrays_int(const int *array_a, const int *array_b, int length);
+int sumarray_int(const int array[], int length);
+int minarray_int(const int array[], int length);
+int maxarray_int(const int array[], int length);
+int dot_arrays_int(const int array_a[], const int array_b[], int length);
 
 int **from_array_to_matrix_int(const int array[], int length_array, int rows,
                                int cols);
@@ -18,6 +18,11 @@ int *row_to_array_int(const int *const *matrix, int array[], int row_idx,
                       int cols);
 int *col_to_array_int(const int *const *matrix, int array[], int col_idx,
                       int rows);
+
+int set_row_int(int **matrix, const int array[], int row_idx, int rows,
+                int cols);
+int set_col_int(int **matrix, const int array[], int col_idx, int rows,
+                int cols);
 
 int **T_matrix_int(const int *const *matrix_origin, int rows, int cols);
 int **dot_matrix_int(const int *const *matrix_A, const int *const *matrix_B,
