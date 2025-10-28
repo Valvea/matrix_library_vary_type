@@ -104,17 +104,32 @@
         double **: sum_matrix_double((const double *const *)(A), (const double *const *)(B), (rows), \
                                      (cols)))
 
+#define sum_matrix_inplace(A, B, rows, cols)                                                         \
+    _Generic((A),                                                                                    \
+        int **: sum_matrix_inplace_int((A), (const int *const *)(B), (rows), (cols)),                \
+        double **: sum_matrix_inplace_double((A), (const double *const *)(B), (rows), (cols)))
+
 #define sub_matrix(A, B, rows, cols)                                                                 \
     _Generic((A),                                                                                    \
         int **: sub_matrix_int((const int *const *)(A), (const int *const *)(B), (rows), (cols)),    \
         double **: sub_matrix_double((const double *const *)(A), (const double *const *)(B), (rows), \
                                      (cols)))
 
+#define sub_matrix_inplace(A, B, rows, cols)                                                         \
+    _Generic((A),                                                                                    \
+        int **: sub_matrix_inplace_int((A), (const int *const *)(B), (rows), (cols)),                \
+        double **: sub_matrix_inplace_double((A), (const double *const *)(B), (rows), (cols)))
+
 #define dot_matrix_Hadamard(A, B, rows, cols)                                                              \
     _Generic((A),                                                                                          \
         int **: dot_matrix_Hadamard_int((const int *const *)(A), (const int *const *)(B), (rows), (cols)), \
         double **: dot_matrix_Hadamard_double((const double *const *)(A), (const double *const *)(B),      \
                                               (rows), (cols)))
+
+#define dot_matrix_Hadamard_inplace(A, B, rows, cols)                                                      \
+    _Generic((A),                                                                                          \
+        int **: dot_matrix_Hadamard_inplace_int((A), (const int *const *)(B), (rows), (cols)),             \
+        double **: dot_matrix_Hadamard_inplace_double((A), (const double *const *)(B), (rows), (cols)))
 
 /* dot_matrix: параметры const T * const * → касты */
 #define dot_matrix(A, rowsA, colsA, B, rowsB, colsB)                                                        \
@@ -132,6 +147,9 @@
 #define dot_arrays_Hadamard(A, B, len)                                                               \
     _Generic((A), const int *: dot_arrays_Hadamard_int, const double *: dot_arrays_Hadamard_double)( \
         (A), (B), (len))
+
+#define dot_arrays_Hadamard_inplace(A, B, len)                                                        \
+    _Generic((A), int *: dot_arrays_Hadamard_inplace_int, double *: dot_arrays_Hadamard_inplace_double)((A), (B), (len))
 
 #define search_array_index(ARR, ELEMENT, KIND, LEN)                                                  \
     _Generic((ARR), const int *: search_array_index_int, const double *: search_array_index_double)( \

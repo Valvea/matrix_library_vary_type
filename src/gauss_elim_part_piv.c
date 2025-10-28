@@ -135,7 +135,7 @@ result_solve matrix_det_lu_double(solve_mode mode, const double *const *matrix_o
         }
     }
 
-    out.invers_matrix = RHS;  /* RHS теперь содержит A^{-1} */
+    out.invers_matrix = RHS; /* RHS теперь содержит A^{-1} */
     out.status = 0;
     free_matrix_double(matrix);
     return out;

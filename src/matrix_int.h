@@ -47,8 +47,10 @@ int min_array_int(const int array[], int length);
 int max_array_int(const int array[], int length);
 /* Скалярное произведение массивов */
 int dot_arrays_int(const int array_a[], const int array_b[], int length);
-/* Поэлементное произведение массивов */
+/* Поэлементное произведение массивов. */
 int *dot_arrays_Hadamard_int(const int array_a[], const int array_b[], int length);
+/* Поэлементное произведение массивов (результат в array_a). */
+int *dot_arrays_Hadamard_inplace_int(int array_a[], const int array_b[], int length);
 
 /* Строит матрицу из плоского массива длиной rows*cols */
 int **from_array_to_matrix_int(const int array[], int length_array, int rows, int cols);
@@ -72,12 +74,18 @@ int **T_matrix_inplace_int(int **matrix_origin, int rows, int cols);
 /* Стандартное умножение матриц A×B */
 int **dot_matrix_int(const int *const *matrix_A, const int *const *matrix_B, int rowsA, int colsA, int rowsB,
                      int colsB);
-/* Поэлементная сумма матриц */
+/* Поэлементная сумма матриц. */
 int **sum_matrix_int(const int *const *matrix_A, const int *const *matrix_B, int rows, int cols);
-/* Поэлементная разность матриц */
+/* Поэлементная сумма матриц (результат в matrix_A). */
+int **sum_matrix_inplace_int(int **matrix_A, const int *const *matrix_B, int rows, int cols);
+/* Поэлементная разность матриц. */
 int **sub_matrix_int(const int *const *matrix_A, const int *const *matrix_B, int rows, int cols);
-/* Поэлементное произведение (Адамара) матриц */
+/* Поэлементная разность матриц (результат в matrix_A). */
+int **sub_matrix_inplace_int(int **matrix_A, const int *const *matrix_B, int rows, int cols);
+/* Поэлементное произведение (Адамара) матриц. */
 int **dot_matrix_Hadamard_int(const int *const *matrix_A, const int *const *matrix_B, int rows, int cols);
+/* Поэлементное произведение (Адамара) матриц (результат в matrix_A). */
+int **dot_matrix_Hadamard_inplace_int(int **matrix_A, const int *const *matrix_B, int rows, int cols);
 /* Возвращает указатель на плоский буфер, следующий за массивом указателей на строки */
 int *matrix_to_array_int(int *const *matrix, int rows);
 

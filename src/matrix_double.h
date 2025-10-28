@@ -45,8 +45,10 @@ double min_array_double(const double array[], int length);
 double max_array_double(const double array[], int length);
 /* Скалярное произведение массивов */
 double dot_arrays_double(const double array_a[], const double array_b[], int length);
-/* Поэлементное произведение (Адамарова) массивов */
+/* Поэлементное произведение (Адамарова) массивов. */
 double *dot_arrays_Hadamard_double(const double array_a[], const double array_b[], int length);
+/* Поэлементное произведение массивов (результат в array_a). */
+double *dot_arrays_Hadamard_inplace_double(double array_a[], const double array_b[], int length);
 
 /* Строит матрицу из плоского массива длиной rows*cols */
 double **from_array_to_matrix_double(const double array[], int length_array, int rows, int cols);
@@ -70,13 +72,20 @@ double **T_matrix_inplace_double(double **matrix_origin, int rows, int cols);
 /* Стандартное умножение матриц A×B */
 double **dot_matrix_double(const double *const *matrix_A, const double *const *matrix_B, int rowsA, int colsA,
                            int rowsB, int colsB);
-/* Поэлементная сумма матриц */
+/* Поэлементная сумма матриц. */
 double **sum_matrix_double(const double *const *matrix_A, const double *const *matrix_B, int rows, int cols);
-/* Поэлементная разность матриц */
+/* Поэлементная сумма матриц (результат в matrix_A). */
+double **sum_matrix_inplace_double(double **matrix_A, const double *const *matrix_B, int rows, int cols);
+/* Поэлементная разность матриц. */
 double **sub_matrix_double(const double *const *matrix_A, const double *const *matrix_B, int rows, int cols);
-/* Поэлементное произведение (Адамара) матриц */
+/* Поэлементная разность матриц (результат в matrix_A). */
+double **sub_matrix_inplace_double(double **matrix_A, const double *const *matrix_B, int rows, int cols);
+/* Поэлементное произведение (Адамара) матриц. */
 double **dot_matrix_Hadamard_double(const double *const *matrix_A, const double *const *matrix_B, int rows,
                                     int cols);
+/* Поэлементное произведение (Адамара) матриц (результат в matrix_A). */
+double **dot_matrix_Hadamard_inplace_double(double **matrix_A, const double *const *matrix_B, int rows,
+                                            int cols);
 /* Возвращает указатель на плоский буфер, расположенный после массива строк */
 double *matrix_to_array_double(double *const *matrix, int rows);
 

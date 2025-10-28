@@ -1,4 +1,5 @@
 // Шаблон для создания матриц с различными типами данных
+
 #ifndef MATRIX_TYPE
 #error "Задает тип int double до включения этого файла"
 #endif
@@ -32,7 +33,7 @@
 void function_(free_matrix)(MATRIX_TYPE **matrix) { free(matrix); }
 
 /* Меняет местами два элемента массива */
-inline void function_(swap_elements)(MATRIX_TYPE *first, MATRIX_TYPE *second) {
+static inline void function_(swap_elements)(MATRIX_TYPE *first, MATRIX_TYPE *second) {
     MATRIX_TYPE temp = *first;
     *first = *second;
     *second = temp;
@@ -43,7 +44,7 @@ static int input_row(MATRIX_TYPE *row, int cols) {
     if (!row || cols <= 0) return 0;
     MATRIX_TYPE temp = 0;
     int index = 0;
-    char delimiter = OUTPUT_DELIMITER;
+    char delimiter = number_delimiter();
     while (index < cols) {
         /* Пытаемся прочитать число и следующий разделитель */
         int scanned = scanf(MATRIX_SCANF "%c", &temp, &delimiter);
@@ -71,16 +72,10 @@ static int input_row(MATRIX_TYPE *row, int cols) {
     return index;
 }
 
-
-
-
-
-
-
 /* Печатает одну строку матрицы с разделителем OUTPUT_DELIMITER */
 static void output_row(const MATRIX_TYPE *row, int cols) {
     if (cols <= 0) return;
-    for (int col = 0; col < cols - 1; col++) printf(MATRIX_PRINTF "%c", row[col], OUTPUT_DELIMITER);
+    for (int col = 0; col < cols - 1; col++) printf(MATRIX_PRINTF "%c", row[col], number_delimiter());
     printf(MATRIX_PRINTF, row[cols - 1]);
 }
 
@@ -93,7 +88,8 @@ MATRIX_TYPE **function_(create_matrix)(int rows, int cols) {
     MATRIX_TYPE **matrix = calloc(1, rows * sizeof *matrix + rows * cols * sizeof **matrix);
     if (!matrix) return NULL;
     MATRIX_TYPE *flat_ptr = (MATRIX_TYPE *)(matrix + rows);
-    for (int row = 0; row < rows; row++) matrix[row] = flat_ptr + row * cols;  /* Привязываем строки к плоскому буферу */
+    for (int row = 0; row < rows; row++)
+        matrix[row] = flat_ptr + row * cols; /* Привязываем строки к плоскому буферу */
     return matrix;
 }
 
@@ -106,7 +102,7 @@ MATRIX_TYPE **function_(unit_matrix)(int rows, int cols) {
     if (!template_matrix) return NULL;
 
     for (int row = 0; row < rows; row++) {
-        template_matrix[row][row] = (MATRIX_TYPE)1;  /* Заполняем единицы на диагонали */
+        template_matrix[row][row] = (MATRIX_TYPE)1; /* Заполняем единицы на диагонали */
     }
 
     return template_matrix;
@@ -129,15 +125,15 @@ int function_(fill_matrix)(MATRIX_TYPE **matrix, int rows, int cols) {
 void function_(print_matrix)(const MATRIX_TYPE *const *matrix, int rows, int cols) {
     for (int row = 0; row < rows; row++) {
         output_row(matrix[row], cols);
-        printf("%c", NEW_LINE);
+        printf("%c", ROW_DELIM_NEWLINE);
     }
 }
 
-/* Считывает размеры и саму матрицу; возвращает выделенный блок или NULL */
+/* Считывает размеры и саму матрицу из стандартного ввода; возвращает выделенный блок или NULL */
 MATRIX_TYPE **function_(scan_matrix)(MATRIX_TYPE **matrix_ptr, int *rows, int *cols) {
-    char end_char = NEW_LINE;
+    char end_char = ROW_DELIM_NEWLINE;
 
-    if (scanf("%d %d%c", rows, cols, &end_char) == 3 && end_char == NEW_LINE) {
+    if (scanf("%d %d%c", rows, cols, &end_char) == 3 && end_char == ROW_DELIM_NEWLINE) {
         matrix_ptr = function_(create_matrix)(*rows, *cols);
         if (!matrix_ptr) return NULL;
         if (!function_(fill_matrix)(matrix_ptr, *rows, *cols)) {
@@ -159,27 +155,51 @@ int function_(search_array_index)(search_element kind, const MATRIX_TYPE *array,
 
     switch (kind) {
         case FIRST_MIN: { /* Первый элемент, который меньше опорного значения */
-            int founded_idx = 0;
+            int founded_idx = -1;
             MATRIX_TYPE min = element;
-            for (int index = 1; index < length; ++index) {
+            for (int index = 0; index < length; ++index) {
                 if (array[index] < min) return index;
             }
             return founded_idx;
         }
 
-        case FIRST_MAX: { /* Первый элемент, который больше опорного значения */
+        case ABSOLUTE_MIN: { /* Элемент, с абсолютным минимумом */
             int founded_idx = 0;
+            MATRIX_TYPE min = array[0];
+            for (int index = 0; index < length; ++index) {
+                if (array[index] < min) {
+                    min = array[index];
+                    founded_idx = index;
+                };
+            }
+            return founded_idx;
+        }
+
+        case FIRST_MAX: { /* Первый элемент, который больше опорного значения */
+            int founded_idx = -1;
             MATRIX_TYPE max = element;
-            for (int index = 1; index < length; ++index) {
+            for (int index = 0; index < length; ++index) {
                 if (array[index] > max) return index;
             }
             return founded_idx;
         }
 
-        case MODULE_MAX: { /* Элемент с максимальным модулем */
+        case ABSOLUTE_MAX: { /* Элемент, с абсолютным максимумом */
             int founded_idx = 0;
+            MATRIX_TYPE max = array[0];
+            for (int index = 0; index < length; ++index) {
+                if (array[index] > max) {
+                    max = array[index];
+                    founded_idx = index;
+                };
+            }
+            return founded_idx;
+        }
+
+        case MODULE_MAX: { /* Элемент с максимальным модулем */
+            int founded_idx = -1;
             MATRIX_TYPE module_max = module_value(element);
-            for (int index = 1; index < length; ++index) {
+            for (int index = 0; index < length; ++index) {
                 MATRIX_TYPE current = module_value(array[index]);
                 if (current > module_max) {
                     module_max = current;
@@ -261,7 +281,7 @@ MATRIX_TYPE function_(sum_array)(const MATRIX_TYPE *array, int length) {
 
 /* Возвращает минимальный элемент массива */
 MATRIX_TYPE function_(min_array)(const MATRIX_TYPE *array, int length) {
-    int index = function_(search_array_index)(FIRST_MIN, array, array[0], length);
+    int index = function_(search_array_index)(ABSOLUTE_MIN, array, array[0], length);
     if (index == -1) return 0;
 
     return array[index];
@@ -269,7 +289,7 @@ MATRIX_TYPE function_(min_array)(const MATRIX_TYPE *array, int length) {
 
 /* Возвращает максимальный элемент массива */
 MATRIX_TYPE function_(max_array)(const MATRIX_TYPE *array, int length) {
-    int index = function_(search_array_index)(FIRST_MAX, array, array[0], length);
+    int index = function_(search_array_index)(ABSOLUTE_MAX, array, array[0], length);
     if (index == -1) return 0;
 
     return array[index];
@@ -298,6 +318,14 @@ MATRIX_TYPE *function_(dot_arrays_Hadamard)(const MATRIX_TYPE *array_a, const MA
     return new_array;
 }
 
+/* Поэлементное произведение массивов  (записывает в a)*/
+MATRIX_TYPE *function_(dot_arrays_Hadamard_inplace)(MATRIX_TYPE *array_a, const MATRIX_TYPE *array_b,
+                                                    int length) {
+    if (!array_a || !array_b || length <= 0) return NULL;
+    for (int index = 0; index < length; index++) array_a[index] *= array_b[index];
+    return array_a;
+}
+
 /* Складывает матрицы поэлементно и возвращает новый блок */
 MATRIX_TYPE **function_(sum_matrix)(const MATRIX_TYPE *const *matrix_A, const MATRIX_TYPE *const *matrix_B,
                                     int rows, int cols) {
@@ -316,6 +344,18 @@ MATRIX_TYPE **function_(sum_matrix)(const MATRIX_TYPE *const *matrix_A, const MA
     }
 
     return result_matrix;
+}
+
+/* Складывает матрицы поэлементно и записывает результат в A */
+MATRIX_TYPE **function_(sum_matrix_inplace)(MATRIX_TYPE **matrix_A, const MATRIX_TYPE *const *matrix_B, int rows,
+                                    int cols) {
+    if (!matrix_A || !matrix_B || rows <= 0 || cols <= 0) return NULL;
+
+    for (int row = 0; row < rows; row++) {
+        matrix_A[row] = function_(add_array_inplace)(matrix_A[row], matrix_B[row], cols);
+    }
+
+    return matrix_A;
 }
 
 /* Вычитает B из A поэлементно */
@@ -338,6 +378,18 @@ MATRIX_TYPE **function_(sub_matrix)(const MATRIX_TYPE *const *matrix_A, const MA
     return result_matrix;
 }
 
+/* Вычитает B из A поэлементно и записывает результат в A */
+MATRIX_TYPE **function_(sub_matrix_inplace)(MATRIX_TYPE **matrix_A, const MATRIX_TYPE *const *matrix_B,
+                                            int rows, int cols) {
+    if (!matrix_A || !matrix_B || rows <= 0 || cols <= 0) return NULL;
+
+    for (int row = 0; row < rows; row++) {
+        matrix_A[row] = function_(sub_array_inplace)(matrix_A[row], matrix_B[row], cols);
+    }
+
+    return matrix_A;
+}
+
 /* Поэлементное (Адамарово) произведение матриц */
 MATRIX_TYPE **function_(dot_matrix_Hadamard)(const MATRIX_TYPE *const *matrix_A,
                                              const MATRIX_TYPE *const *matrix_B, int rows, int cols) {
@@ -356,6 +408,18 @@ MATRIX_TYPE **function_(dot_matrix_Hadamard)(const MATRIX_TYPE *const *matrix_A,
     }
 
     return result_matrix;
+}
+
+/* Поэлементное (Адамарово) произведение матриц, записывает резульат в A */
+MATRIX_TYPE **function_(dot_matrix_Hadamard_inplace)(MATRIX_TYPE **matrix_A, const MATRIX_TYPE *const *matrix_B,
+                                             int rows, int cols) {
+    if (!matrix_A || !matrix_B || rows <= 0 || cols <= 0) return NULL;
+
+    for (int row = 0; row < rows; row++) {
+        matrix_A[row] = function_(dot_arrays_Hadamard_inplace)(matrix_A[row], matrix_B[row], cols);
+    }
+
+    return matrix_A;
 }
 
 /* Копирует строку матрицы в предоставленный буфер */
@@ -399,7 +463,9 @@ MATRIX_TYPE **function_(T_matrix)(const MATRIX_TYPE *const *matrix_origin, int r
     }
 
     for (int rowT = 0; rowT < rowsT; rowT++) {
-        memcpy(T_matrix[rowT], function_(col_to_array)(matrix_origin, array, rowT, rows), /* Берём столбец исходной и превращаем в строку результата */
+        memcpy(T_matrix[rowT],
+               function_(col_to_array)(matrix_origin, array, rowT,
+                                       rows), /* Берём столбец исходной и превращаем в строку результата */
                rows * sizeof *array);
     }
 
@@ -432,7 +498,8 @@ MATRIX_TYPE **function_(dot_matrix)(const MATRIX_TYPE *const *matrix_A, const MA
 
     if (!result_matrix) return NULL;
 
-    MATRIX_TYPE **matrix_T = function_(T_matrix)(matrix_B, rowsB, colsB); /* Транспонируем B, чтобы легче брать колонки */
+    MATRIX_TYPE **matrix_T =
+        function_(T_matrix)(matrix_B, rowsB, colsB); /* Транспонируем B, чтобы легче брать колонки */
 
     if (!matrix_T) {
         function_(free_matrix)(result_matrix);
@@ -441,7 +508,8 @@ MATRIX_TYPE **function_(dot_matrix)(const MATRIX_TYPE *const *matrix_A, const MA
 
     for (int row = 0; row < rowsR; row++) {
         for (int col = 0; col < colsR; col++) {
-            result_matrix[row][col] = function_(dot_arrays)(matrix_A[row], matrix_T[col], length_array); /* Строка A × строка B^T */
+            result_matrix[row][col] =
+                function_(dot_arrays)(matrix_A[row], matrix_T[col], length_array); /* Строка A × строка B^T */
         }
     }
 
@@ -474,7 +542,8 @@ MATRIX_TYPE **function_(from_array_to_matrix)(const MATRIX_TYPE array[], int len
 
     MATRIX_TYPE *flat_ptr = function_(matrix_to_array)(matrix, rows);
 
-    for (int row = 0; row < rows; row++) matrix[row] = flat_ptr + cols * row; /* Каждой строке сопоставляем свой срез */
+    for (int row = 0; row < rows; row++)
+        matrix[row] = flat_ptr + cols * row; /* Каждой строке сопоставляем свой срез */
 
     memcpy(flat_ptr, array, length_array * sizeof *array);
 
@@ -484,7 +553,7 @@ MATRIX_TYPE **function_(from_array_to_matrix)(const MATRIX_TYPE array[], int len
 /* Классическая сортировка вставками: хороша для маленьких диапазонов */
 void function_(insertion_sort)(MATRIX_TYPE array[], int length) {
     for (int index = 1; index < length; index++) {
-        MATRIX_TYPE key_element = array[index];   /* Элемент, который будем вставлять */
+        MATRIX_TYPE key_element = array[index]; /* Элемент, который будем вставлять */
         int left_index = index - 1;
 
         /* Сдвигаем элементы вправо, пока не найдём позицию для key_element */
@@ -492,14 +561,15 @@ void function_(insertion_sort)(MATRIX_TYPE array[], int length) {
             array[left_index + 1] = array[left_index];
             left_index--;
         }
-        array[left_index + 1] = key_element;      /* Вставка элемента на найденное место */
+        array[left_index + 1] = key_element; /* Вставка элемента на найденное место */
     }
 }
 
 /* Рекурсивное ядро быстрой сортировки с выбором первого элемента в качестве опоры */
 static void function_(_quick_sort_core)(MATRIX_TYPE *array, int length) {
     if (length == 2) {
-        if (array[0] > array[1]) function_(swap_elements)(&array[0], &array[1]); /* Маленький случай обработан вручную */
+        if (array[0] > array[1])
+            function_(swap_elements)(&array[0], &array[1]); /* Маленький случай обработан вручную */
         return;
     }
 
@@ -510,8 +580,8 @@ static void function_(_quick_sort_core)(MATRIX_TYPE *array, int length) {
 
     int support_idx = 0;
     MATRIX_TYPE support_element = array[support_idx]; /* Опорный элемент — первый в сегменте */
-    int right_scanner = length - 1;      // правый сканер
-    int left_scanner = support_idx + 1;  // левый сканер
+    int right_scanner = length - 1;                   // правый сканер
+    int left_scanner = support_idx + 1;               // левый сканер
 
     int seen_less = 0, seen_greater = 0;
     while (right_scanner > left_scanner) {
@@ -585,11 +655,13 @@ MATRIX_TYPE **function_(sort_matrix)(MATRIX_TYPE **matrix, int rows, int cols) {
 
     if (!temp_block_memory) return NULL;
 
-    array = memcpy(temp_block_memory, array, array_length * sizeof *array); /* Копируем данные для сортировки */
+    array =
+        memcpy(temp_block_memory, array, array_length * sizeof *array); /* Копируем данные для сортировки */
 
     function_(_quick_sort_)(array, array_length);
 
-    MATRIX_TYPE **sorted_matrix = function_(from_array_to_matrix)(array, array_length, rows, cols); /* Создаём матрицу из отсортированного массива */
+    MATRIX_TYPE **sorted_matrix = function_(from_array_to_matrix)(
+        array, array_length, rows, cols); /* Создаём матрицу из отсортированного массива */
 
     free(temp_block_memory);
 
