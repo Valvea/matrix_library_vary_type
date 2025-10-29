@@ -1,8 +1,8 @@
 #include "matrix_idx.h"
 
 #include <limits.h>
-#include <stdlib.h>
 
+#include "matrix_common.h"
 #include "matrix_core.h"
 
 /* Возвращает указатель на элемент матрицы или NULL при нарушении предусловий. */
@@ -139,6 +139,7 @@ static int OP_search_implement(MatType matrix_type, const void *matrix_value, co
 
     switch (matrix_type) {
         case MAT_F64: {
+            if (condition->type_value != VAL_DOUBLE) return -1;
             double val = *(const double *)matrix_value;
             double ref = condition->value.as_double;
 
@@ -148,19 +149,21 @@ static int OP_search_implement(MatType matrix_type, const void *matrix_value, co
                 case OP_ABOVE:
                     return val > ref;
                 case OP_EQUAL:
-                    return val == ref;
+                    return equal_type_double(val, ref);
                 case OP_NOT_EQUAL:
-                    return val != ref;
+                    return !equal_type_double(val, ref);
                 case OP_LESS_EQUAL:
-                    return val <= ref;
+                    return (val < ref) || equal_type_double(val, ref);
                 case OP_ABOVE_EQUAL:
-                    return val >= ref;
+                    return (val > ref) || equal_type_double(val, ref);
+                    ;
             }
 
             return -1;  // неизвестная операция
         }
 
         case MAT_INT32: {
+            if (condition->type_value != VAL_INT) return -1;
             int val = *(const int *)matrix_value;
             int ref = condition->value.as_int;
 
@@ -188,17 +191,53 @@ static int OP_search_implement(MatType matrix_type, const void *matrix_value, co
 }
 
 /* Проверяет одно значение матрицы на соответствие набору условий. */
-static int validate_value(MatType matrix_type, const void *matrix_value, const Query *input) {
+static int validate_kit(MatType matrix_type, const void *matrix_value, const Kit_Conditions *kit) {
+    if (!kit || kit->mode == NO_MODE || kit->count == 0) return -1;
+
+    switch (kit->mode) {
+        case MATCH_ALL: {
+            for (size_t idx = 0; idx < kit->count; idx++) {
+                int r = OP_search_implement(matrix_type, matrix_value, &kit->conditions[idx]);
+                if (r == -1) return -1;  // ошибка — пробрасываем наверх
+                if (r == 0) return 0;  // одно условие не прошло — весь AND не прошёл
+            }
+            return 1;
+        }
+        case MATCH_ANY: {
+            for (size_t idx = 0; idx < kit->count; idx++) {
+                int r = OP_search_implement(matrix_type, matrix_value, &kit->conditions[idx]);
+                if (r == -1) return -1;  // ошибка — пробрасываем наверх
+                if (r == 1) return 1;    // любое прошло — OR прошёл
+            }
+            return 0;
+        }
+        default:
+            return -1;
+    }
+}
+
+/* Проверяет наборы условий. */
+static int final_decision(MatType matrix_type, const void *matrix_value, const Query *input) {
+    if (!input || input->mode == NO_MODE || input->count == 0) return -1;
+    if (input->count > MAX_KITS_PER_QUERY) return -1;
+    for (size_t i = 0; i < input->count; ++i) {
+        if (input->kits[i].mode == NO_MODE || input->kits[i].count == 0) return -1;
+        if (input->kits[i].count > MAX_CONDS_PER_KIT) return -1;
+    }
     switch (input->mode) {
         case MATCH_ALL: {
             for (size_t idx = 0; idx < input->count; idx++) {
-                if (!OP_search_implement(matrix_type, matrix_value, &input->conditions[idx])) return 0;
+                int r = validate_kit(matrix_type, matrix_value, &input->kits[idx]);
+                if (r == -1) return -1;  // ошибка изнутри
+                if (r == 0) return 0;  // одна клауза не прошла — весь AND не прошёл
             }
             return 1;
         }
         case MATCH_ANY: {
             for (size_t idx = 0; idx < input->count; idx++) {
-                if (OP_search_implement(matrix_type, matrix_value, &input->conditions[idx])) return 1;
+                int r = validate_kit(matrix_type, matrix_value, &input->kits[idx]);
+                if (r == -1) return -1;
+                if (r == 1) return 1;
             }
             return 0;
         }
@@ -209,26 +248,37 @@ static int validate_value(MatType matrix_type, const void *matrix_value, const Q
 
 /* Собирает индексы элементов, удовлетворяющих запросу, и возвращает их количество (-1 при ошибке). */
 int mat_where(Matrix *matrix, Matrix_Idxs *indices, const Query *query_in) {
-    if (!matrix || !matrix->cols || !matrix->rows || !matrix->flat_data || !indices || !query_in ||
-        !query_in->count || query_in->mode==NO_MODE)
-        return -1;
+    if (!matrix || !indices || !query_in || !matrix->flat_data) return -1;
+    if (matrix->rows <= 0 || matrix->cols <= 0) return -1;
+    if (query_in->mode == NO_MODE || query_in->count == 0) return -1;
+    if (query_in->count > MAX_KITS_PER_QUERY) return -1;
+    for (size_t i = 0; i < query_in->count; ++i) {
+        if (query_in->kits[i].mode == NO_MODE || query_in->kits[i].count == 0) return -1;
+        if (query_in->kits[i].count > MAX_CONDS_PER_KIT) return -1;
+    }
 
     size_t start_count = indices->count;
-    Idx m_like_idx = {.ptr = matrix};
+    Idx idx = {.ptr = matrix};
 
     for (int row = 0; row < matrix->rows; row++) {
         for (int col = 0; col < matrix->cols; col++) {
-            m_like_idx.row = row;
-            m_like_idx.col = col;
-            if (validate_value(matrix->type, read_value_ptr_from_Idx(m_like_idx), query_in)) {
-                int idx = push_mat_idx(indices, m_like_idx);
-                if (idx == -1) {
+            idx.row = row;
+            idx.col = col;
+            int result = final_decision(matrix->type, read_value_ptr_from_Idx(idx), query_in);
+            if (result == -1) {
+                indices->count = start_count;
+                return -1;
+            }
+            if (result) {
+                int pushed = push_mat_idx(indices, idx);
+                if (pushed == -1) {
                     indices->count = start_count;
                     return -1;
                 }
             }
         }
     }
+
     return (int)(indices->count - start_count);
 }
 

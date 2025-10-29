@@ -2,8 +2,6 @@
 #ifndef MATRIX_CORE_H
 #define MATRIX_CORE_H
 
-
-
 #ifdef __cplusplus
 extern "C" {
 #endif

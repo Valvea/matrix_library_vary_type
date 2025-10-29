@@ -13,9 +13,9 @@ extern "C" {
 #define MATRIX_EPSILON 1e-12 /* Допуск для сравнения чисел с плавающей точкой */
 #endif
 
-// ALL_LESS_THEN_VALUE,  /* Проверить, что все элементы меньше опорного значения. */
-//  ALL_MORE_THEN_VALUE,  /* Проверить, что все элементы больше опорного значения. */
-// ALL_EQUAL_VALUE,          /* Проверить, что все элементы равны опорному значению. */
+#ifndef MATRIX_EPSILON_REL
+#define MATRIX_EPSILON_REL 1e-9
+#endif
 
 /* Стратегии поиска индекса в массиве. */
 typedef enum {
@@ -93,9 +93,14 @@ ProcssState write_matrix_to_file(const char *filename, const char *format, void 
 
 /* Сравнение целых чисел без допуска. */
 static inline int equal_type_int(long long first, long long second) { return first == second; }
-/* Сравнение double с учётом MATRIX_EPSILON. */
+/* Сравнение double с учётом MATRIX_EPSILON и MATRIX_EPSILON_REL */
 static inline int equal_type_double(double first, double second) {
-    return module_value(first - second) < MATRIX_EPSILON;
+    if (isnan(first) || isnan(second)) return 0;
+    if (isinf(first) || isinf(second)) return first == second;  // +inf==+inf, -inf==-inf
+
+    double diff = module_value(first - second);
+    double scale = fmax(1.0, fmax(module_value(first), module_value(second)));
+    return diff <= fmax(MATRIX_EPSILON, MATRIX_EPSILON_REL * scale);
 }
 /* Универсальное сравнение для целых и вещественных значений. */
 #define equal_values(first, second) \

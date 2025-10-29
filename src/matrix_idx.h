@@ -35,9 +35,14 @@ typedef enum {
     OP_ABOVE_EQUAL  // >=
 } OP_search;
 
+typedef enum { VAL_INT, VAL_DOUBLE } ValueKind;  // тип сравниваемого значения
+
+enum { MAX_CONDS_PER_KIT = 10, MAX_KITS_PER_QUERY = 10 };  // лимиты выражений сравнения
+
 /* Описание одиночного условия сравнения. */
 typedef struct {
     OP_search kind;
+    ValueKind type_value;
     union {
         int as_int;
         double as_double;
@@ -48,12 +53,19 @@ typedef struct {
 typedef enum {
     NO_MODE,
     MATCH_ALL,  // Полное совпадение (все условия должны выполниться)
-    MATCH_ANY   // Частичное совпадение (достаточно одного совпадения)
+    MATCH_ANY  // Частичное совпадение (достаточно одного совпадения)
 } MatchMode;
 
-/* Запрос, содержащий несколько условий и режим сравнения. */
+/* Набор, одиночных условий и режим проверки. */
 typedef struct {
-    Condition conditions[10];
+    Condition conditions[MAX_CONDS_PER_KIT];
+    size_t count;
+    MatchMode mode;
+} Kit_Conditions;
+
+/* Запрос, содержащий набор условий и режим проверки. */
+typedef struct {
+    Kit_Conditions kits[MAX_KITS_PER_QUERY];
     size_t count;
     MatchMode mode;
 } Query;
@@ -76,7 +88,8 @@ void clear_mat_indices(Matrix_Idxs *ptr);
 /* Освобождает все ресурсы контейнера. */
 void free_mat_indices(Matrix_Idxs *ptr);
 
-/* Добавляет в slices прямоугольный срез между двумя координатами (последняя колонка входит, -1 при ошибке). */
+/* Добавляет в slices прямоугольный срез между двумя координатами (последняя колонка входит, -1 при ошибке).
+ */
 int mat_slice(Matrix *m, Idx from, Idx to, Matrix_Idxs *slices);
 
 /* Возвращает изменяемый указатель на элемент матрицы. */
