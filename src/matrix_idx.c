@@ -1,6 +1,6 @@
 #include "matrix_idx.h"
 
-#include <stddef.h>
+#include <limits.h>
 #include <stdlib.h>
 
 #include "matrix_core.h"
@@ -27,14 +27,10 @@ static void *value_ptr_internal(Idx index) {
 }
 
 /* Возвращает указатель только для чтения. */
-const void *read_value_ptr_from_Idx(Idx index) {
-    return value_ptr_internal(index);
-}
+const void *read_value_ptr_from_Idx(Idx index) { return value_ptr_internal(index); }
 
 /* Возвращает указатель с правом записи. */
-void *get_value_ptr_from_Idx(Idx index) {
-    return value_ptr_internal(index);
-}
+void *get_value_ptr_from_Idx(Idx index) { return value_ptr_internal(index); }
 
 /* Записывает значение из new_value в ptr_data согласно типу матрицы. */
 int set_value_from_ptr_Idx(MatType type, void *ptr_data, const void *new_value) {
@@ -99,12 +95,11 @@ Idx pop_mat_idx(Matrix_Idxs *ptr, size_t i) {
     return ptr->indices[i];
 }
 
-/* Добавляет в slices прямоугольный срез между двумя координатами (последняя колонка входит, SIZE_MAX при ошибке). */
-size_t mat_slice(Idx from, Idx to, Matrix_Idxs *slices) {
-    if (!slices || (!from.ptr && !to.ptr) || from.ptr != to.ptr) return 0;
+/* Возвращает количество добавленных индексов (последняя колонка входит, -1 при ошибке). */
+int mat_slice(Matrix *m, Idx from, Idx to, Matrix_Idxs *slices) {
+    if (!slices || !m || !m->flat_data || !m->rows || !m->cols) return -1;
 
-    Matrix *matrix = from.ptr;
-    if (!matrix || !matrix->rows || !matrix->cols) return 0;
+    Matrix *matrix = m;
 
     from.row = ((from.row % matrix->rows) + matrix->rows) % matrix->rows;
     to.row = ((to.row % matrix->rows) + matrix->rows) % matrix->rows;
@@ -112,11 +107,11 @@ size_t mat_slice(Idx from, Idx to, Matrix_Idxs *slices) {
     from.col = ((from.col % matrix->cols) + matrix->cols) % matrix->cols;
     to.col = ((to.col % matrix->cols) + matrix->cols) % matrix->cols;
 
-    int start_row= from.row < to.row ? from.row : to.row;
+    int start_row = from.row < to.row ? from.row : to.row;
     int end_row = to.row > from.row ? to.row : from.row;
 
-    int start_col = from.col<to.col?from.col:to.col;
-    int end_col = start_col==from.col?to.col:from.col;
+    int start_col = from.col < to.col ? from.col : to.col;
+    int end_col = start_col == from.col ? to.col : from.col;
 
     size_t start_idxs = slices->count;
 
@@ -129,7 +124,112 @@ size_t mat_slice(Idx from, Idx to, Matrix_Idxs *slices) {
         }
     }
 
-    return slices->count - start_idxs;
+    size_t produced = slices->count - start_idxs;
+    if (produced > INT_MAX) {
+        slices->count = start_idxs;
+        return -1;
+    }
+
+    return (int)produced;
+}
+
+/* Проверяет, выполняется ли одиночное условие Condition для заданного значения. */
+static int OP_search_implement(MatType matrix_type, const void *matrix_value, const Condition *condition) {
+    if (!condition || !matrix_value) return -1;
+
+    switch (matrix_type) {
+        case MAT_F64: {
+            double val = *(const double *)matrix_value;
+            double ref = condition->value.as_double;
+
+            switch (condition->kind) {
+                case OP_LESS:
+                    return val < ref;
+                case OP_ABOVE:
+                    return val > ref;
+                case OP_EQUAL:
+                    return val == ref;
+                case OP_NOT_EQUAL:
+                    return val != ref;
+                case OP_LESS_EQUAL:
+                    return val <= ref;
+                case OP_ABOVE_EQUAL:
+                    return val >= ref;
+            }
+
+            return -1;  // неизвестная операция
+        }
+
+        case MAT_INT32: {
+            int val = *(const int *)matrix_value;
+            int ref = condition->value.as_int;
+
+            switch (condition->kind) {
+                case OP_LESS:
+                    return val < ref;
+                case OP_ABOVE:
+                    return val > ref;
+                case OP_EQUAL:
+                    return val == ref;
+                case OP_NOT_EQUAL:
+                    return val != ref;
+                case OP_LESS_EQUAL:
+                    return val <= ref;
+                case OP_ABOVE_EQUAL:
+                    return val >= ref;
+            }
+
+            return -1;  // неизвестная операция
+        }
+
+        default:
+            return -1;
+    }
+}
+
+/* Проверяет одно значение матрицы на соответствие набору условий. */
+static int validate_value(MatType matrix_type, const void *matrix_value, const Query *input) {
+    switch (input->mode) {
+        case MATCH_ALL: {
+            for (size_t idx = 0; idx < input->count; idx++) {
+                if (!OP_search_implement(matrix_type, matrix_value, &input->conditions[idx])) return 0;
+            }
+            return 1;
+        }
+        case MATCH_ANY: {
+            for (size_t idx = 0; idx < input->count; idx++) {
+                if (OP_search_implement(matrix_type, matrix_value, &input->conditions[idx])) return 1;
+            }
+            return 0;
+        }
+        default:
+            return -1;
+    }
+}
+
+/* Собирает индексы элементов, удовлетворяющих запросу, и возвращает их количество (-1 при ошибке). */
+int mat_where(Matrix *matrix, Matrix_Idxs *indices, const Query *query_in) {
+    if (!matrix || !matrix->cols || !matrix->rows || !matrix->flat_data || !indices || !query_in ||
+        !query_in->count || query_in->mode==NO_MODE)
+        return -1;
+
+    size_t start_count = indices->count;
+    Idx m_like_idx = {.ptr = matrix};
+
+    for (int row = 0; row < matrix->rows; row++) {
+        for (int col = 0; col < matrix->cols; col++) {
+            m_like_idx.row = row;
+            m_like_idx.col = col;
+            if (validate_value(matrix->type, read_value_ptr_from_Idx(m_like_idx), query_in)) {
+                int idx = push_mat_idx(indices, m_like_idx);
+                if (idx == -1) {
+                    indices->count = start_count;
+                    return -1;
+                }
+            }
+        }
+    }
+    return (int)(indices->count - start_count);
 }
 
 /* Сбрасывает логический размер, не освобождая память. */

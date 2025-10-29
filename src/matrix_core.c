@@ -1,10 +1,7 @@
 #include "matrix_core.h"
 
-
 #include <stdlib.h>
 #include <string.h>
-
-
 
 /* Возвращает размер элемента для конкретного типа матрицы либо 0, если тип неподдерживаемый */
 static size_t element_size_of(MatType mat_type) {

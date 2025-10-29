@@ -154,7 +154,7 @@ int function_(search_array_index)(search_element kind, const MATRIX_TYPE *array,
     if (length == 1) return equal_values(array[0], element) ? 0 : -1;
 
     switch (kind) {
-        case FIRST_MIN: { /* Первый элемент, который меньше опорного значения */
+        case FIRST_LESS: { /* Первый элемент, который меньше опорного значения */
             int founded_idx = -1;
             MATRIX_TYPE min = element;
             for (int index = 0; index < length; ++index) {
@@ -175,7 +175,7 @@ int function_(search_array_index)(search_element kind, const MATRIX_TYPE *array,
             return founded_idx;
         }
 
-        case FIRST_MAX: { /* Первый элемент, который больше опорного значения */
+        case FIRST_ABOVE: { /* Первый элемент, который больше опорного значения */
             int founded_idx = -1;
             MATRIX_TYPE max = element;
             for (int index = 0; index < length; ++index) {
@@ -196,7 +196,7 @@ int function_(search_array_index)(search_element kind, const MATRIX_TYPE *array,
             return founded_idx;
         }
 
-        case MODULE_MAX: { /* Элемент с максимальным модулем */
+        case MODULE_ABOVE: { /* Элемент с максимальным модулем */
             int founded_idx = -1;
             MATRIX_TYPE module_max = module_value(element);
             for (int index = 0; index < length; ++index) {
@@ -347,8 +347,8 @@ MATRIX_TYPE **function_(sum_matrix)(const MATRIX_TYPE *const *matrix_A, const MA
 }
 
 /* Складывает матрицы поэлементно и записывает результат в A */
-MATRIX_TYPE **function_(sum_matrix_inplace)(MATRIX_TYPE **matrix_A, const MATRIX_TYPE *const *matrix_B, int rows,
-                                    int cols) {
+MATRIX_TYPE **function_(sum_matrix_inplace)(MATRIX_TYPE **matrix_A, const MATRIX_TYPE *const *matrix_B,
+                                            int rows, int cols) {
     if (!matrix_A || !matrix_B || rows <= 0 || cols <= 0) return NULL;
 
     for (int row = 0; row < rows; row++) {
@@ -411,8 +411,8 @@ MATRIX_TYPE **function_(dot_matrix_Hadamard)(const MATRIX_TYPE *const *matrix_A,
 }
 
 /* Поэлементное (Адамарово) произведение матриц, записывает резульат в A */
-MATRIX_TYPE **function_(dot_matrix_Hadamard_inplace)(MATRIX_TYPE **matrix_A, const MATRIX_TYPE *const *matrix_B,
-                                             int rows, int cols) {
+MATRIX_TYPE **function_(dot_matrix_Hadamard_inplace)(MATRIX_TYPE **matrix_A,
+                                                     const MATRIX_TYPE *const *matrix_B, int rows, int cols) {
     if (!matrix_A || !matrix_B || rows <= 0 || cols <= 0) return NULL;
 
     for (int row = 0; row < rows; row++) {
@@ -581,7 +581,7 @@ static void function_(_quick_sort_core)(MATRIX_TYPE *array, int length) {
     int support_idx = 0;
     MATRIX_TYPE support_element = array[support_idx]; /* Опорный элемент — первый в сегменте */
     int right_scanner = length - 1;                   // правый сканер
-    int left_scanner = support_idx + 1;               // левый сканер
+    int left_scanner = support_idx + 1;  // левый сканер
 
     int seen_less = 0, seen_greater = 0;
     while (right_scanner > left_scanner) {

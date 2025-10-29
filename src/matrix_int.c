@@ -1,3 +1,4 @@
+#include "matrix_int.h"
 #define MATRIX_TYPE int /* Базовый тип элементов матрицы */
 #define MATRIX_TAG int /* Суффикс, который будет подставлен в имена функций */
 #define MATRIX_SCANF "%d"  /* Спецификатор для чтения элементов */
