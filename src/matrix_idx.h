@@ -37,7 +37,7 @@ typedef enum {
 
 typedef enum { VAL_INT, VAL_DOUBLE } ValueKind;  // тип сравниваемого значения
 
-enum { MAX_CONDS_PER_KIT = 10, MAX_KITS_PER_QUERY = 10 };  // лимиты выражений сравнения
+enum { MAX_CONDS_PER_CLAUSE = 10, MAX_CLAUSES_PER_QUERY = 10 };  // лимиты выражений сравнения
 
 /* Описание одиночного условия сравнения. */
 typedef struct {
@@ -58,14 +58,14 @@ typedef enum {
 
 /* Набор, одиночных условий и режим проверки. */
 typedef struct {
-    Condition conditions[MAX_CONDS_PER_KIT];
+    Condition conditions[MAX_CONDS_PER_CLAUSE];
     size_t count;
     MatchMode mode;
-} Kit_Conditions;
+} Clause;
 
 /* Запрос, содержащий набор условий и режим проверки. */
 typedef struct {
-    Kit_Conditions kits[MAX_KITS_PER_QUERY];
+    Clause clauses[MAX_CLAUSES_PER_QUERY];
     size_t count;
     MatchMode mode;
 } Query;
@@ -103,6 +103,8 @@ int set_value_from_ptr_Idx(MatType type, void *ptr_data, const void *new_value);
 
 /* Ищет элементы матрицы, удовлетворяющие запросу; возвращает число совпадений или -1. */
 int mat_where(Matrix *matrix, Matrix_Idxs *indices, const Query *query_in);
+
+Query create_Query(const Clause *clauses, size_t clause_count, MatchMode mode);
 
 #ifdef __cplusplus
 }

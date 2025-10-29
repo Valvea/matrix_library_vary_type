@@ -191,21 +191,21 @@ static int OP_search_implement(MatType matrix_type, const void *matrix_value, co
 }
 
 /* Проверяет одно значение матрицы на соответствие набору условий. */
-static int validate_kit(MatType matrix_type, const void *matrix_value, const Kit_Conditions *kit) {
-    if (!kit || kit->mode == NO_MODE || kit->count == 0) return -1;
+static int validate_clause(MatType matrix_type, const void *matrix_value, const Clause *clause) {
+    if (!clause || clause->mode == NO_MODE || clause->count == 0) return -1;
 
-    switch (kit->mode) {
+    switch (clause->mode) {
         case MATCH_ALL: {
-            for (size_t idx = 0; idx < kit->count; idx++) {
-                int r = OP_search_implement(matrix_type, matrix_value, &kit->conditions[idx]);
+            for (size_t idx = 0; idx < clause->count; idx++) {
+                int r = OP_search_implement(matrix_type, matrix_value, &clause->conditions[idx]);
                 if (r == -1) return -1;  // ошибка — пробрасываем наверх
-                if (r == 0) return 0;  // одно условие не прошло — весь AND не прошёл
+                if (r == 0) return 0;    // одно условие не прошло — весь AND не прошёл
             }
             return 1;
         }
         case MATCH_ANY: {
-            for (size_t idx = 0; idx < kit->count; idx++) {
-                int r = OP_search_implement(matrix_type, matrix_value, &kit->conditions[idx]);
+            for (size_t idx = 0; idx < clause->count; idx++) {
+                int r = OP_search_implement(matrix_type, matrix_value, &clause->conditions[idx]);
                 if (r == -1) return -1;  // ошибка — пробрасываем наверх
                 if (r == 1) return 1;    // любое прошло — OR прошёл
             }
@@ -218,24 +218,19 @@ static int validate_kit(MatType matrix_type, const void *matrix_value, const Kit
 
 /* Проверяет наборы условий. */
 static int final_decision(MatType matrix_type, const void *matrix_value, const Query *input) {
-    if (!input || input->mode == NO_MODE || input->count == 0) return -1;
-    if (input->count > MAX_KITS_PER_QUERY) return -1;
-    for (size_t i = 0; i < input->count; ++i) {
-        if (input->kits[i].mode == NO_MODE || input->kits[i].count == 0) return -1;
-        if (input->kits[i].count > MAX_CONDS_PER_KIT) return -1;
-    }
     switch (input->mode) {
         case MATCH_ALL: {
             for (size_t idx = 0; idx < input->count; idx++) {
-                int r = validate_kit(matrix_type, matrix_value, &input->kits[idx]);
+                int r = validate_clause(matrix_type, matrix_value, &input->clauses[idx]);
                 if (r == -1) return -1;  // ошибка изнутри
-                if (r == 0) return 0;  // одна клауза не прошла — весь AND не прошёл
+                if (r == 0) return 0;    // одна клауза не прошла — весь AND не прошёл
             }
             return 1;
         }
-        case MATCH_ANY: {
+        case MATCH_ANY:
+        case NO_MODE: {
             for (size_t idx = 0; idx < input->count; idx++) {
-                int r = validate_kit(matrix_type, matrix_value, &input->kits[idx]);
+                int r = validate_clause(matrix_type, matrix_value, &input->clauses[idx]);
                 if (r == -1) return -1;
                 if (r == 1) return 1;
             }
@@ -250,11 +245,11 @@ static int final_decision(MatType matrix_type, const void *matrix_value, const Q
 int mat_where(Matrix *matrix, Matrix_Idxs *indices, const Query *query_in) {
     if (!matrix || !indices || !query_in || !matrix->flat_data) return -1;
     if (matrix->rows <= 0 || matrix->cols <= 0) return -1;
-    if (query_in->mode == NO_MODE || query_in->count == 0) return -1;
-    if (query_in->count > MAX_KITS_PER_QUERY) return -1;
+    if (query_in->count == 0) return -1;
+    if (query_in->count > MAX_CLAUSES_PER_QUERY) return -1;
     for (size_t i = 0; i < query_in->count; ++i) {
-        if (query_in->kits[i].mode == NO_MODE || query_in->kits[i].count == 0) return -1;
-        if (query_in->kits[i].count > MAX_CONDS_PER_KIT) return -1;
+        if (query_in->clauses[i].mode == NO_MODE || query_in->clauses[i].count == 0) return -1;
+        if (query_in->clauses[i].count > MAX_CONDS_PER_CLAUSE) return -1;
     }
 
     size_t start_count = indices->count;
@@ -280,6 +275,20 @@ int mat_where(Matrix *matrix, Matrix_Idxs *indices, const Query *query_in) {
     }
 
     return (int)(indices->count - start_count);
+}
+
+Query create_Query(const Clause *clauses, size_t clause_count, MatchMode mode) {
+    Query query = {.mode = mode, .count = 0};
+    if (!clauses || clause_count == 0) {
+        return query;  // пустой запрос
+    }
+
+    size_t limit = clause_count < MAX_CLAUSES_PER_QUERY ? clause_count : MAX_CLAUSES_PER_QUERY;
+    for (size_t i = 0; i < limit; ++i) {
+        query.clauses[i] = clauses[i];
+    }
+    query.count = limit;
+    return query;
 }
 
 /* Сбрасывает логический размер, не освобождая память. */
