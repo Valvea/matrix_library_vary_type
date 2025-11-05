@@ -2,8 +2,11 @@
 
 #include <errno.h>
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
 
 /* Символьные константы десятичных цифр ASCII. */
 typedef enum {
@@ -108,10 +111,101 @@ static int str_to_dnumber(char *str, double **buffer, size_t *buff_cup) {
     return elements;
 }
 
+/* При необходимости растягиваем буфер вдвое. */
+static void *resize_buffer(void *buff_ptr, size_t *old_size, size_t add) {
+    void *temp = realloc(buff_ptr, 2 * ( *old_size ? *old_size: 256)+add);
+    if (!temp) return NULL;
+    buff_ptr = temp;
+    (*old_size) *= 2;
+
+    return buff_ptr;
+}
+
+/* Превращает текст с числами в динамически расширяемый буфер */
+static size_t read_text(char *str, unsigned char **buffer, size_t *buff_cup, Readtype scan_type) {
+    size_t scaned_elems = 0;
+    size_t elem_size = 0;
+    switch (scan_type) {
+        case Read_char:
+            elem_size = sizeof(char);
+            break;
+        case Read_double:
+            elem_size = sizeof(double);
+            break;
+        case Read_long:
+            elem_size = sizeof(long);
+            break;
+        case Read_int:
+            elem_size = sizeof(int);
+            break;
+        default:
+            break;
+    }
+    if (!elem_size) return scaned_elems;
+    char *next_double_ptr = NULL;
+    errno = 0;
+    char *save_row;
+    char *row = strtok_portable(str, ROW_DELIMETER, &save_row);
+
+    while (row) {
+        if (scan_type == Read_char) {
+            size_t new_row = strlen(row) + 1;
+            if (*buff_cup <= (new_row + scaned_elems) * elem_size) {
+                *buffer = resize_buffer(*buffer, buff_cup,new_row);
+                if (!*buffer) return scaned_elems;
+            }
+            unsigned char *ptr_buffer = *buffer;
+            memcpy(ptr_buffer + scaned_elems * elem_size, row, new_row);
+            scaned_elems+=new_row;
+
+        } else {
+            /* Обрабатываем только строки, содержащие числа. */
+            if (valid_row(row)) {
+                char *save_sub_row = NULL;
+                char *sub_row = strtok_portable(row, ROW_DELIMITERS, &save_sub_row);
+                while (sub_row) {
+                    errno = 0;
+                    if (*buff_cup <= (scaned_elems+1) * elem_size) {
+                        *buffer = resize_buffer(*buffer, buff_cup,elem_size);
+                        if (!*buffer) return scaned_elems;
+                    }
+                    unsigned char *ptr_buffer = *buffer;
+                    switch (scan_type) {
+                        case Read_double: {
+                            double value_temp = strtod(sub_row, &next_double_ptr);
+                            if ((sub_row == next_double_ptr) || (*next_double_ptr != '\0') ||
+                                errno == ERANGE) {
+                                value_temp = NAN;
+                            }
+                            memcpy(ptr_buffer + (scaned_elems++) * elem_size, &value_temp, elem_size);
+                        } break;
+                        case Read_long: {
+                            long value_temp = strtol(sub_row, NULL, 10);
+                            memcpy(ptr_buffer + (scaned_elems++) * elem_size, &value_temp, elem_size);
+                        } break;
+                        case Read_int: {
+                            int value_temp = (int)strtol(sub_row, NULL, 10);
+                            memcpy(ptr_buffer + (scaned_elems++) * elem_size, &value_temp, elem_size);
+                        } break;
+                        default:
+                            break;
+                    }
+                    
+                    sub_row = strtok_portable(NULL, ROW_DELIMITERS, &save_sub_row);
+                }
+            }
+        }
+
+        row = strtok_portable(NULL, ROW_DELIMETER, &save_row);
+    }
+
+    return scaned_elems;
+}
+
 /* Считывает файл целиком и конвертирует найденные числа в плоский буфер double */
-read_data read_matrix_from_file(const char *filename) {
+read_data read_matrix_from_file(const char *filename, Readtype scan_input) {
     /* Инициализируем контейнер результатом по умолчанию. */
-    read_data container = {.elems_fl_data_count = 0, .flat_data = NULL, .status = NORMAL, .capacity = 0};
+    read_data container = {.elems_fl_data_count = 0, .flat_data = NULL, .status = NORMAL, .capacity = 0,.type=scan_input};
 
     FILE *file = fopen(filename, "rb");
     if (!file) {
@@ -134,7 +228,7 @@ read_data read_matrix_from_file(const char *filename) {
     fseek(file, 0, SEEK_SET);
 
     /* Буфер для исходного текстового содержимого. */
-    char *dinamic_buffer = calloc(file_size + 1, sizeof *dinamic_buffer);
+    char *dinamic_buffer = calloc(file_size+1, sizeof *dinamic_buffer);
     if (!dinamic_buffer) {
         container.status = ERROR_MEM_ALLOC;
         return container;
@@ -142,7 +236,7 @@ read_data read_matrix_from_file(const char *filename) {
 
     /* Буфер для результатов преобразования в числа. */
     size_t res_buf_cup = file_size;
-    double *res_buffer = calloc(res_buf_cup, sizeof *res_buffer);
+    unsigned char *res_buffer = calloc(res_buf_cup, sizeof *res_buffer);
     if (!res_buffer) {
         free(dinamic_buffer);
         container.status = ERROR_MEM_ALLOC;
@@ -163,7 +257,7 @@ read_data read_matrix_from_file(const char *filename) {
     }
 
     /* Преобразуем текстовую матрицу в числовой буфер, допускающий расширение. */
-    container.elems_fl_data_count = str_to_dnumber(dinamic_buffer, &res_buffer, &res_buf_cup);
+    container.elems_fl_data_count = read_text(dinamic_buffer, &res_buffer, &res_buf_cup,scan_input);
     container.capacity = res_buf_cup;
     container.flat_data = res_buffer;
 

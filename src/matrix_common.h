@@ -17,6 +17,7 @@ extern "C" {
 #define MATRIX_EPSILON_REL 1e-9
 #endif
 
+
 /* Стратегии поиска индекса в массиве. */
 typedef enum {
     FIRST_LESS, /* Первый элемент, который строго меньше заданного значения. */
@@ -48,13 +49,26 @@ typedef enum {
     FILE_EMPTY
 } ProcssState;
 
+
+
+/* Тип считываемой матрицы */
+typedef enum {
+    Read_NONE,
+    Read_double ,
+    Read_long,
+    Read_int,
+    Read_char,
+} Readtype;
+
+
+
 /* Результат чтения матрицы из файла. */
 typedef struct read_data {
     ProcssState status;      /* Итог операции. */
-    double *flat_data;       /* Указатель на плоский буфер значений. */
+    void *flat_data;       /* Указатель на плоский буфер значений. */
     size_t capacity;         /* Выделенная ёмкость буфера. */
     int elems_fl_data_count; /* Количество фактически считанных элементов. */
-
+    Readtype type;           /* Cчитываемый тип. */
 } read_data;
 
 /* Разделители, воспринимаемые как границы между числами при вводе. */
@@ -74,7 +88,7 @@ static inline void set_row_delimiter(RowDelimiters delim) { ROW_DELIMETER[0] = (
 static inline char row_delimiter(void) { return ROW_DELIMETER[0]; }
 
 /* Считывание матрицы из файла в плоском представлении. */
-read_data read_matrix_from_file(const char *filename);
+read_data read_matrix_from_file(const char *filename, Readtype scan_type);
 
 /* Запись матрицы в файл с контролем допустимости формата. */
 ProcssState write_matrix_to_file(const char *filename, const char *format, void *const matrix_data, int rows,
